@@ -1161,9 +1161,18 @@ class PlayerViewModel @Inject constructor(
                 val albumsLoadDuration = System.currentTimeMillis() - repoCallAlbumsStartTime
                 Log.d("PlayerViewModelPerformance", "musicRepository.getAllAlbumsOnce (All) took $albumsLoadDuration ms for ${allAlbumsList.size} albums.")
 
+                val currentSort = _playerUiState.value.currentAlbumSortOption
+                val sortedList = when (currentSort) {
+                    SortOption.AlbumTitleAZ -> allAlbumsList.sortedBy { it.title }
+                    SortOption.AlbumTitleZA -> allAlbumsList.sortedByDescending { it.title }
+                    SortOption.AlbumArtist -> allAlbumsList.sortedBy { it.artist }
+                    SortOption.AlbumReleaseYear -> allAlbumsList.sortedByDescending { it.year }
+                    else -> allAlbumsList
+                }
+
                 _playerUiState.update { currentState ->
                     currentState.copy(
-                        albums = allAlbumsList.toImmutableList(),
+                        albums = sortedList.toImmutableList(),
                         isLoadingLibraryCategories = false
                     )
                 }
