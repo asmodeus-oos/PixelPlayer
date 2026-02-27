@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.os.Bundle
@@ -860,7 +861,16 @@ class WearCommandReceiver : WearableListenerService() {
     private fun sendVolumeState(nodeId: String, level: Int, max: Int) {
         scope.launch {
             runCatching {
-                val payload = json.encodeToString(WearVolumeState(level = level, max = max))
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val activeRoute = resolveActiveOutputRoute(audioManager)
+                val payload = json.encodeToString(
+                    WearVolumeState(
+                        level = level,
+                        max = max,
+                        routeType = activeRoute.type,
+                        routeName = activeRoute.name,
+                    )
+                )
                     .toByteArray(Charsets.UTF_8)
                 val messageClient = Wearable.getMessageClient(this@WearCommandReceiver)
                 messageClient.sendMessage(nodeId, WearDataPaths.VOLUME_STATE, payload).await()
@@ -868,6 +878,77 @@ class WearCommandReceiver : WearableListenerService() {
                 Timber.tag(TAG).w(error, "Failed to send volume state update to watch")
             }
         }
+    }
+
+    private data class ActiveOutputRoute(
+        val type: String,
+        val name: String,
+    )
+
+    private fun resolveActiveOutputRoute(audioManager: AudioManager): ActiveOutputRoute {
+        if (isCastingMediaPlayback()) {
+            return ActiveOutputRoute(
+                type = WearVolumeState.ROUTE_TYPE_CAST,
+                name = "Cast",
+            )
+        }
+
+        val outputs = runCatching {
+            audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList()
+        }.getOrDefault(emptyList())
+
+        val bluetoothDevice = outputs.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                it.type == AudioDeviceInfo.TYPE_BLE_BROADCAST
+        }
+        if (bluetoothDevice != null || audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn) {
+            return ActiveOutputRoute(
+                type = WearVolumeState.ROUTE_TYPE_BLUETOOTH,
+                name = bluetoothDevice?.productName?.toString().orEmpty().ifBlank { "Bluetooth" },
+            )
+        }
+
+        val wiredDevice = outputs.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                it.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+                it.type == AudioDeviceInfo.TYPE_USB_DEVICE ||
+                it.type == AudioDeviceInfo.TYPE_USB_ACCESSORY
+        }
+        if (wiredDevice != null || audioManager.isWiredHeadsetOn) {
+            return ActiveOutputRoute(
+                type = WearVolumeState.ROUTE_TYPE_HEADPHONES,
+                name = wiredDevice?.productName?.toString().orEmpty().ifBlank { "Headphones" },
+            )
+        }
+
+        val speakerDevice = outputs.firstOrNull {
+            it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER ||
+                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE
+        }
+        if (speakerDevice != null) {
+            return ActiveOutputRoute(
+                type = WearVolumeState.ROUTE_TYPE_SPEAKER,
+                name = "Phone speaker",
+            )
+        }
+
+        return ActiveOutputRoute(
+            type = WearVolumeState.ROUTE_TYPE_PHONE,
+            name = "Phone",
+        )
+    }
+
+    private fun isCastingMediaPlayback(): Boolean {
+        val castSession = resolveActiveCastSession() ?: return false
+        val remoteClient = castSession.remoteMediaClient ?: return false
+        val playerState = remoteClient.playerState
+        return remoteClient.mediaStatus != null &&
+            playerState != MediaStatus.PLAYER_STATE_IDLE &&
+            playerState != MediaStatus.PLAYER_STATE_UNKNOWN
     }
 
     // ---- Transfer handling ----

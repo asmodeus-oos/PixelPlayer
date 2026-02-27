@@ -260,6 +260,8 @@ class WearDataListenerService : WearableListenerService() {
                     stateRepository.updateVolumeState(
                         level = volumeState.level,
                         max = volumeState.max,
+                        routeType = volumeState.routeType,
+                        routeName = volumeState.routeName,
                     )
                 } catch (e: Exception) {
                     Timber.tag(TAG).e(e, "Failed to process volume state update")

@@ -36,11 +36,9 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.PhoneAndroid
@@ -99,6 +97,7 @@ import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
 import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.presentation.components.AlwaysOnScalingPositionIndicator
+import com.theveloper.pixelplay.presentation.components.outputRouteIcon
 import com.theveloper.pixelplay.presentation.components.WearTopTimeText
 import com.theveloper.pixelplay.presentation.shapes.RoundedStarShape
 import com.theveloper.pixelplay.presentation.theme.LocalWearPalette
@@ -120,12 +119,14 @@ fun PlayerScreen(
     onBrowseClick: () -> Unit = {},
     onVolumeClick: () -> Unit = {},
     onOutputClick: () -> Unit = {},
+    onMoreClick: () -> Unit = {},
     onQueueClick: () -> Unit = onBrowseClick,
     viewModel: WearPlayerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.playerState.collectAsState()
     val isPhoneConnected by viewModel.isPhoneConnected.collectAsState()
     val isWatchOutputSelected by viewModel.isWatchOutputSelected.collectAsState()
+    val activeOutputRouteType by viewModel.activeOutputRouteType.collectAsState()
     val albumArt by viewModel.albumArt.collectAsState()
 
     PlayerContent(
@@ -137,11 +138,11 @@ fun PlayerScreen(
         onNext = viewModel::next,
         onPrevious = viewModel::previous,
         onToggleFavorite = viewModel::toggleFavorite,
-        onToggleShuffle = viewModel::toggleShuffle,
-        onCycleRepeat = viewModel::cycleRepeat,
+        activeOutputRouteType = activeOutputRouteType,
         onBrowseClick = onBrowseClick,
         onVolumeClick = onVolumeClick,
         onOutputClick = onOutputClick,
+        onMoreClick = onMoreClick,
         onQueueClick = onQueueClick,
     )
 }
@@ -156,11 +157,11 @@ private fun PlayerContent(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onToggleShuffle: () -> Unit,
-    onCycleRepeat: () -> Unit,
+    activeOutputRouteType: String,
     onBrowseClick: () -> Unit,
     onVolumeClick: () -> Unit,
     onOutputClick: () -> Unit,
+    onMoreClick: () -> Unit,
     onQueueClick: () -> Unit,
 ) {
     val palette = LocalWearPalette.current
@@ -201,8 +202,9 @@ private fun PlayerContent(
                         onNext = onNext,
                         onPrevious = onPrevious,
                         onToggleFavorite = onToggleFavorite,
-                        onToggleShuffle = onToggleShuffle,
-                        onCycleRepeat = onCycleRepeat,
+                        activeOutputRouteType = activeOutputRouteType,
+                        onOutputClick = onOutputClick,
+                        onMoreClick = onMoreClick,
                         onQueueClick = onQueueClick,
                         onQueueShortcutRevealChanged = { mainPageQueueReveal = it },
                     )
@@ -761,8 +763,9 @@ private fun MainPlayerPage(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onToggleShuffle: () -> Unit,
-    onCycleRepeat: () -> Unit,
+    activeOutputRouteType: String,
+    onOutputClick: () -> Unit,
+    onMoreClick: () -> Unit,
     onQueueClick: () -> Unit,
     onQueueShortcutRevealChanged: (Float) -> Unit,
 ) {
@@ -850,21 +853,23 @@ private fun MainPlayerPage(
                 )
             }
 
-            if (!isWatchOutputSelected) {
-                item {
-                    SecondaryControlsRow(
-                        isFavorite = state.isFavorite,
-                        isShuffleEnabled = state.isShuffleEnabled,
-                        repeatMode = state.repeatMode,
-                        enabled = isPhoneConnected && !state.isEmpty,
-                        onToggleFavorite = onToggleFavorite,
-                        onToggleShuffle = onToggleShuffle,
-                        onCycleRepeat = onCycleRepeat,
-                        favoriteActiveColor = palette.favoriteActive,
-                        shuffleActiveColor = palette.shuffleActive,
-                        repeatActiveColor = palette.repeatActive,
-                    )
-                }
+            item {
+                SecondaryControlsRow(
+                    isFavorite = state.isFavorite,
+                    favoriteEnabled = isPhoneConnected && !state.isEmpty && !isWatchOutputSelected,
+                    deviceEnabled = isPhoneConnected || isWatchOutputSelected,
+                    deviceRouteType = if (isWatchOutputSelected) {
+                        com.theveloper.pixelplay.shared.WearVolumeState.ROUTE_TYPE_WATCH
+                    } else {
+                        activeOutputRouteType
+                    },
+                    moreEnabled = true,
+                    onToggleFavorite = onToggleFavorite,
+                    onOutputClick = onOutputClick,
+                    onMoreClick = onMoreClick,
+                    favoriteActiveColor = palette.favoriteActive,
+                    deviceActiveColor = palette.shuffleActive,
+                )
             }
 
             item { Spacer(modifier = Modifier.height(50.dp)) }
@@ -1161,15 +1166,15 @@ private fun CenterPlayButton(
 @Composable
 private fun SecondaryControlsRow(
     isFavorite: Boolean,
-    isShuffleEnabled: Boolean,
-    repeatMode: Int,
-    enabled: Boolean,
+    favoriteEnabled: Boolean,
+    deviceEnabled: Boolean,
+    deviceRouteType: String,
+    moreEnabled: Boolean,
     onToggleFavorite: () -> Unit,
-    onToggleShuffle: () -> Unit,
-    onCycleRepeat: () -> Unit,
+    onOutputClick: () -> Unit,
+    onMoreClick: () -> Unit,
     favoriteActiveColor: Color,
-    shuffleActiveColor: Color,
-    repeatActiveColor: Color,
+    deviceActiveColor: Color,
 ) {
     Row(
         modifier = Modifier
@@ -1184,7 +1189,7 @@ private fun SecondaryControlsRow(
         SecondaryActionSlot(lower = false) {
             SecondaryActionButton(
                 icon = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                enabled = enabled,
+                enabled = favoriteEnabled,
                 active = isFavorite,
                 activeColor = favoriteActiveColor,
                 onClick = onToggleFavorite,
@@ -1193,22 +1198,22 @@ private fun SecondaryControlsRow(
         }
         SecondaryActionSlot(lower = true) {
             SecondaryActionButton(
-                icon = Icons.Rounded.Shuffle,
-                enabled = enabled,
-                active = isShuffleEnabled,
-                activeColor = shuffleActiveColor,
-                onClick = onToggleShuffle,
-                contentDescription = "Shuffle",
+                icon = outputRouteIcon(deviceRouteType),
+                enabled = deviceEnabled,
+                active = deviceRouteType == com.theveloper.pixelplay.shared.WearVolumeState.ROUTE_TYPE_WATCH,
+                activeColor = deviceActiveColor,
+                onClick = onOutputClick,
+                contentDescription = "Output device",
             )
         }
         SecondaryActionSlot(lower = false) {
             SecondaryActionButton(
-                icon = if (repeatMode == 1) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
-                enabled = enabled,
-                active = repeatMode != 0,
-                activeColor = repeatActiveColor,
-                onClick = onCycleRepeat,
-                contentDescription = "Repeat",
+                icon = Icons.Rounded.MoreVert,
+                enabled = moreEnabled,
+                active = false,
+                activeColor = deviceActiveColor,
+                onClick = onMoreClick,
+                contentDescription = "More options",
             )
         }
     }

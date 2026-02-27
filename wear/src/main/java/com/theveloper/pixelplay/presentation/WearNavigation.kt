@@ -9,6 +9,7 @@ import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.theveloper.pixelplay.presentation.screens.BrowseScreen
 import com.theveloper.pixelplay.presentation.screens.DownloadsScreen
 import com.theveloper.pixelplay.presentation.screens.LibraryListScreen
+import com.theveloper.pixelplay.presentation.screens.MoreScreen
 import com.theveloper.pixelplay.presentation.screens.OutputScreen
 import com.theveloper.pixelplay.presentation.screens.PlayerScreen
 import com.theveloper.pixelplay.presentation.screens.QueueScreen
@@ -31,6 +32,7 @@ object WearScreens {
     const val PLAYER = "player"
     const val VOLUME = "volume"
     const val OUTPUT = "output"
+    const val MORE = "more"
     const val QUEUE = "queue"
     const val TIMER = "timer"
     const val BROWSE = "browse"
@@ -70,6 +72,11 @@ fun WearNavigation() {
                         launchSingleTop = true
                     }
                 },
+                onMoreClick = {
+                    navController.navigate(WearScreens.MORE) {
+                        launchSingleTop = true
+                    }
+                },
                 onQueueClick = {
                     navController.navigate(WearScreens.QUEUE) {
                         launchSingleTop = true
@@ -84,6 +91,21 @@ fun WearNavigation() {
 
         composable(WearScreens.OUTPUT) {
             OutputScreen()
+        }
+
+        composable(WearScreens.MORE) {
+            MoreScreen(
+                onQueueClick = {
+                    navController.navigate(WearScreens.QUEUE) {
+                        launchSingleTop = true
+                    }
+                },
+                onSettingsClick = {
+                    navController.navigate(WearScreens.OUTPUT) {
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
 
         composable(WearScreens.QUEUE) {

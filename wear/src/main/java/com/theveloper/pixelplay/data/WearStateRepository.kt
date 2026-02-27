@@ -42,7 +42,12 @@ class WearStateRepository @Inject constructor() {
     fun updatePlayerState(state: WearPlayerState) {
         _playerState.value = state
         if (state.volumeMax > 0) {
-            updateVolumeState(level = state.volumeLevel, max = state.volumeMax)
+            updateVolumeState(
+                level = state.volumeLevel,
+                max = state.volumeMax,
+                routeType = _volumeState.value.routeType,
+                routeName = _volumeState.value.routeName,
+            )
         }
     }
 
@@ -64,10 +69,20 @@ class WearStateRepository @Inject constructor() {
         _outputTarget.value = target
     }
 
-    fun updateVolumeState(level: Int, max: Int) {
+    fun updateVolumeState(
+        level: Int,
+        max: Int,
+        routeType: String = _volumeState.value.routeType,
+        routeName: String = _volumeState.value.routeName,
+    ) {
         val safeMax = max.coerceAtLeast(0)
         val safeLevel = level.coerceIn(0, safeMax.takeIf { it > 0 } ?: 0)
-        _volumeState.value = WearVolumeState(level = safeLevel, max = safeMax)
+        _volumeState.value = WearVolumeState(
+            level = safeLevel,
+            max = safeMax,
+            routeType = routeType,
+            routeName = routeName,
+        )
     }
 
     fun nudgePhoneVolumeLevel(delta: Int) {
