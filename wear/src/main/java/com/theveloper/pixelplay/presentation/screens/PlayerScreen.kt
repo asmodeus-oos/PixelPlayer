@@ -3,12 +3,10 @@ package com.theveloper.pixelplay.presentation.screens
 import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -1066,19 +1064,25 @@ private fun CenterPlayButton(
         animationSpec = spring(),
         label = "playStarCurve",
     )
-    val infiniteTransition = rememberInfiniteTransition(label = "playStarSpin")
-    val spinningRotation by infiniteTransition.animateFloat(
-        initialValue = 360f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 13800,
-                easing = LinearEasing,
-            ),
-        ),
-        label = "playStarRotationInfinite",
-    )
-    val animatedRotation = if (isPlaying) spinningRotation else 0f
+    val rotation = remember { Animatable(0f) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (true) {
+                val current = rotation.value
+                rotation.animateTo(
+                    targetValue = current + 360f,
+                    animationSpec = tween(
+                        durationMillis = 13800,
+                        easing = LinearEasing,
+                    ),
+                )
+                if (rotation.value >= 3600f) {
+                    rotation.snapTo(rotation.value % 360f)
+                }
+            }
+        }
+    }
+    val animatedRotation = rotation.value
     val animatedSize by animateDpAsState(
         targetValue = if (isPlaying) 60.dp else 56.dp,
         animationSpec = spring(),
