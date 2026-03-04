@@ -1891,9 +1891,10 @@ class MusicService : MediaLibraryService() {
             }
 
             override fun onRepeatModeChanged(repeatMode: Int) {
-                // Prevent user from disabling repeat-one
+                // User explicitly changed repeat mode while counted play is active:
+                // cancel counted play and accept the new mode instead of fighting back.
                 if (countedPlayActive && repeatMode != Player.REPEAT_MODE_ONE) {
-                    player.repeatMode = Player.REPEAT_MODE_ONE
+                    stopCountedPlay(restoreRepeatMode = false)
                 }
             }
         }
@@ -1902,7 +1903,7 @@ class MusicService : MediaLibraryService() {
         player.addListener(listener)
     }
 
-    fun stopCountedPlay() {
+    fun stopCountedPlay(restoreRepeatMode: Boolean = true) {
         if (!countedPlayActive) return
 
         countedPlayActive = false
@@ -1915,8 +1916,10 @@ class MusicService : MediaLibraryService() {
         }
         countedPlayListener = null
 
-        // Restore normal repeat mode (OFF)
-        engine.masterPlayer.repeatMode = Player.REPEAT_MODE_OFF
+        // Restore normal repeat mode (OFF) only when not triggered by a user repeat-mode change
+        if (restoreRepeatMode) {
+            engine.masterPlayer.repeatMode = Player.REPEAT_MODE_OFF
+        }
     }
 
     /**
