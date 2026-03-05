@@ -30,7 +30,11 @@ class PlaylistsModuleHandler @Inject constructor(
     override val section = BackupSection.PLAYLISTS
 
     override suspend fun export(): String = withContext(Dispatchers.IO) {
-        val playlists = playlistPreferencesRepository.getPlaylistsOnce()
+        val allPlaylists = playlistPreferencesRepository.getPlaylistsOnce()
+
+        // Only export local/AI playlists — cloud playlists (Telegram, Netease, QQMusic)
+        // are tied to service auth and would be empty on restore
+        val playlists = allPlaylists.filter { it.source in LOCAL_SOURCES }
 
         // Build a set of cloud song IDs to exclude from backup
         val cloudSongIds = buildCloudSongIdSet()
@@ -70,9 +74,10 @@ class PlaylistsModuleHandler @Inject constructor(
 
     override suspend fun countEntries(): Int = withContext(Dispatchers.IO) {
         val playlists = playlistPreferencesRepository.getPlaylistsOnce()
+            .count { it.source in LOCAL_SOURCES }
         val orderModes = playlistPreferencesRepository.playlistSongOrderModesFlow.first()
         val sortOption = playlistPreferencesRepository.playlistsSortOptionFlow.first()
-        playlists.size + orderModes.size + if (sortOption.isNotBlank()) 1 else 0
+        playlists + orderModes.size + if (sortOption.isNotBlank()) 1 else 0
     }
 
     override suspend fun snapshot(): String = withContext(Dispatchers.IO) {
@@ -305,6 +310,9 @@ class PlaylistsModuleHandler @Inject constructor(
     companion object {
         private const val TAG = "PlaylistsModuleHandler"
         private const val DURATION_TOLERANCE_MS = 2000L
+
+        /** Playlist sources that are backed up. Cloud-sourced playlists are excluded. */
+        private val LOCAL_SOURCES = setOf("LOCAL", "AI")
 
         const val LEGACY_USER_PLAYLISTS_KEY = "user_playlists_json_v1"
         const val LEGACY_PLAYLIST_ORDER_MODES_KEY = "playlist_song_order_modes"
