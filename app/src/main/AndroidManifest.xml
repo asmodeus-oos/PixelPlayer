@@ -58,6 +58,11 @@
                 <action android:name="com.theveloper.pixelplay.action.OPEN_PLAYER" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MUSIC_PLAYER" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MUSIC" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -85,6 +90,12 @@
             android:name=".presentation.qqmusic.auth.QqMusicLoginActivity"
             android:exported="false"
             android:label="QQ Music Login"
+            android:theme="@style/Theme.PixelPlay" />
+
+        <activity
+            android:name=".presentation.navidrome.auth.NavidromeLoginActivity"
+            android:exported="false"
+            android:label="Navidrome Login"
             android:theme="@style/Theme.PixelPlay" />
 
 
